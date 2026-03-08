@@ -2,9 +2,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    firebase_credentials: str
+    firebase_credentials: str | None = None
     firebase_storage_bucket: str | None = None
-    upload_dir: str = "uploads"
+    upload_dir: str = "uploads" 
 
     model_config = SettingsConfigDict(
         env_file=".env",
