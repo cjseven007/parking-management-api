@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Secrets / credentials
+*serviceAccountKey*.json
+*service-account*.json
+*firebase*.json
+secrets/
+credentials/
+
+# Uploaded / generated files
+uploads/
+tmp/
+*.log
+
+# Test / cache / coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.cache/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+ezpark-5fcf7-firebase-adminsdk-fbsvc-d16c07592f.json
