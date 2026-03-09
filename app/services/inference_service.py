@@ -1,5 +1,23 @@
+import os
 import cv2
+import torch
 import numpy as np
+
+MODEL_PATH = os.getenv("PARKING_MODEL_PATH", "model/parking_classifier_mobilenetv3_ts.pt")
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+CLASSES = ["empty", "occupied"]
+
+_model = None
+
+
+def get_model():
+    global _model
+
+    if _model is None:
+        _model = torch.jit.load(MODEL_PATH, map_location=DEVICE)
+        _model.eval()
+
+    return _model
 
 
 def crop_slot(frame, slot: dict):
@@ -60,6 +78,123 @@ def run_inference_for_slots(frame, slots: list[dict]) -> list[dict]:
 
         occupied, confidence = infer_slot_occupancy(crop)
 
+        results.append(
+            {
+                "slotId": slot["id"],
+                "label": slot["label"],
+                "occupied": occupied,
+                "isAvailable": not occupied,
+                "confidence": confidence,
+            }
+        )
+
+    return results
+
+# def preprocess_crop_to_array(crop: np.ndarray) -> np.ndarray:
+#     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+#     gray = cv2.resize(gray, (48, 48))
+#     gray = gray.astype(np.float32) / 255.0
+#     return gray
+
+def preprocess_crop_to_array_mobilenet(crop: np.ndarray) -> np.ndarray:
+    # BGR -> RGB
+    rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+    rgb = cv2.resize(rgb, (224, 224))
+    rgb = rgb.astype(np.float32) / 255.0
+
+    # ImageNet normalization for pretrained torchvision models
+    mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+    std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+    rgb = (rgb - mean) / std
+
+    # HWC -> CHW
+    rgb = np.transpose(rgb, (2, 0, 1))  # [3, 224, 224]
+    return rgb
+
+# @torch.no_grad()
+# def infer_slots_batch(crops: list[np.ndarray]) -> list[tuple[bool, float]]:
+#     model = get_model()
+
+#     batch = [preprocess_crop_to_array(crop) for crop in crops]
+#     batch = np.array(batch, dtype=np.float32)   # [N, 48, 48]
+#     batch = np.expand_dims(batch, axis=1)       # [N, 1, 48, 48]
+
+#     x = torch.from_numpy(batch).to(DEVICE)
+
+#     logits = model(x)
+#     probs = torch.softmax(logits, dim=1)
+#     pred_indices = torch.argmax(probs, dim=1)
+
+#     outputs = []
+#     for i in range(len(crops)):
+#         pred_idx = int(pred_indices[i].item())
+#         pred_label = CLASSES[pred_idx]
+#         confidence = float(probs[i, pred_idx].item())
+#         occupied = pred_label == "occupied"
+#         outputs.append((occupied, round(confidence, 4)))
+
+#     return outputs
+
+@torch.no_grad()
+def infer_slots_batch_mobilenet(crops: list[np.ndarray]) -> list[tuple[bool, float]]:
+    model = get_model()
+
+    batch = [preprocess_crop_to_array_mobilenet(crop) for crop in crops]
+    batch = np.array(batch, dtype=np.float32)  # [N, 3, 224, 224]
+    x = torch.from_numpy(batch).to(DEVICE)
+
+    logits = model(x)
+    probs = torch.softmax(logits, dim=1)
+    pred_indices = torch.argmax(probs, dim=1)
+
+    outputs = []
+    for i in range(len(crops)):
+        pred_idx = int(pred_indices[i].item())
+        pred_label = CLASSES[pred_idx]
+        confidence = float(probs[i, pred_idx].item())
+        occupied = pred_label == "occupied"
+        outputs.append((occupied, round(confidence, 4)))
+
+    return outputs
+
+# def run_inference_for_slots_torch(frame, slots: list[dict]) -> list[dict]:
+#     valid_slots = []
+#     crops = []
+
+#     for slot in slots:
+#         crop = crop_slot(frame, slot)
+#         valid_slots.append(slot)
+#         crops.append(crop)
+
+#     predictions = infer_slots_batch(crops)
+
+#     results = []
+#     for slot, (occupied, confidence) in zip(valid_slots, predictions):
+#         results.append(
+#             {
+#                 "slotId": slot["id"],
+#                 "label": slot["label"],
+#                 "occupied": occupied,
+#                 "isAvailable": not occupied,
+#                 "confidence": confidence,
+#             }
+#         )
+
+#     return results
+
+def run_inference_for_slots_mobilenet(frame, slots: list[dict]) -> list[dict]:
+    valid_slots = []
+    crops = []
+
+    for slot in slots:
+        crop = crop_slot(frame, slot)
+        valid_slots.append(slot)
+        crops.append(crop)
+
+    predictions = infer_slots_batch_mobilenet(crops)
+
+    results = []
+    for slot, (occupied, confidence) in zip(valid_slots, predictions):
         results.append(
             {
                 "slotId": slot["id"],

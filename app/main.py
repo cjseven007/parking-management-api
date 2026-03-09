@@ -12,14 +12,18 @@ from app.services.slot_service import (
     update_slot_inference_results,
 )
 from app.services.video_service import save_upload_file_temp, extract_frame
-from app.services.inference_service import run_inference_for_slots
+from app.services.inference_service import run_inference_for_slots_mobilenet
 from app.utils.json_parser import parse_bounding_boxes_json
 import os
 
 
 app = FastAPI(title="Parking Admin API")
 cors_origins = os.getenv("CORS_ORIGINS", "")
-origins = [(o.strip() for o in cors_origins.split(",") if o.strip()), "http://localhost:5173", "http://127.0.0.1:5173"]
+origins = [o.strip() for o in cors_origins.split(",") if o.strip()]
+origins.extend([
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+])
 
 app.add_middleware(
     CORSMiddleware,
@@ -96,7 +100,8 @@ async def infer_from_video(
         video_path = save_upload_file_temp(video)
         frame, total_frames = extract_frame(video_path, frameIndex)
 
-        inference_results = run_inference_for_slots(frame, slots)
+        # Model is only loaded here, lazily, on first inference request
+        inference_results = run_inference_for_slots_mobilenet(frame, slots)
         counts = update_slot_inference_results(area_id, frameIndex, inference_results)
 
         return {

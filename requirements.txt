@@ -7,3 +7,4 @@ numpy
 pydantic
 pydantic-settings
 python-dotenv
+torch 
