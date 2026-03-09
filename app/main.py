@@ -17,7 +17,7 @@ from app.utils.json_parser import parse_bounding_boxes_json
 import os
 
 
-app = FastAPI(title="Parking Admin API")
+app = FastAPI(title="EZPark: Parking Management API", description="API for managing parking areas and performing inference on parking slot occupancy.")
 cors_origins = os.getenv("CORS_ORIGINS", "")
 origins = [o.strip() for o in cors_origins.split(",") if o.strip()]
 origins.extend([
